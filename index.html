@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Pong with Difficulty</title>
+  <style>
+    body {
+      background: black;
+      color: white;
+      text-align: center;
+      font-family: Arial, sans-serif;
+      margin: 0;
+    }
+    canvas {
+      background: black;
+      display: block;
+      margin: auto;
+    }
+    #menu {
+      margin-top: 20px;
+    }
+    button, input, select {
+      padding: 10px;
+      font-size: 16px;
+      margin: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Pong Game</h1>
+  <div id="menu">
+    <label>Difficulty: </label>
+    <select id="difficulty">
+      <option value="easy">Easy</option>
+      <option value="medium">Medium</option>
+      <option value="hard">Hard</option>
+      <option value="impossible">Impossible</option>
+    </select>
+    <label>Points to Win: </label>
+    <input type="number" id="pointsToWin" value="5" min="1">
+    <button onclick="startGame()">Start Game</button>
+  </div>
+  <canvas id="pongCanvas" width="800" height="500"></canvas>
+
+  <script>
+    const canvas = document.getElementById("pongCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let paddleHeight = 100;
+    let paddleWidth = 10;
+    let playerY = canvas.height / 2 - paddleHeight / 2;
+    let aiY = canvas.height / 2 - paddleHeight / 2;
+    let ballSize = 10;
+    let ballX, ballY, ballSpeedX, ballSpeedY;
+
+    let playerScore = 0;
+    let aiScore = 0;
+    let gameRunning = false;
+    let aiSpeed, aiReaction;
+
+    function startGame() {
+      const difficulty = document.getElementById("difficulty").value;
+      const pointsToWin = parseInt(document.getElementById("pointsToWin").value);
+
+      switch (difficulty) {
+        case "easy":
+          aiSpeed = 2;
+          aiReaction = 0.75;
+          break;
+        case "medium":
+          aiSpeed = 4;
+          aiReaction = 0.85;
+          break;
+        case "hard":
+          aiSpeed = 6;
+          aiReaction = 0.93;
+          break;
+        case "impossible":
+          aiSpeed = 8;
+          aiReaction = 1.0;
+          break;
+      }
+
+      playerScore = 0;
+      aiScore = 0;
+      resetBall();
+      gameRunning = true;
+
+      document.getElementById("menu").style.display = "none";
+
+      function gameLoop() {
+        if (!gameRunning) return;
+        update(pointsToWin);
+        draw();
+        requestAnimationFrame(gameLoop);
+      }
+      gameLoop();
+    }
+
+    function resetBall() {
+      ballX = canvas.width / 2;
+      ballY = canvas.height / 2;
+      ballSpeedX = Math.random() < 0.5 ? 4 : -4;
+      ballSpeedY = (Math.random() - 0.5) * 4;
+    }
+
+    function update(pointsToWin) {
+      ballX += ballSpeedX;
+      ballY += ballSpeedY;
+
+      // AI paddle movement with reaction
+      if (Math.random() < aiReaction) {
+        if (Math.abs(aiY + paddleHeight / 2 - ballY) > 10) {
+          if (ballY < aiY + paddleHeight / 2) aiY -= aiSpeed;
+          else aiY += aiSpeed;
+        }
+      }
+
+      // Top and bottom wall collision
+      if (ballY - ballSize < 0 || ballY + ballSize > canvas.height) {
+        ballSpeedY = -ballSpeedY;
+      }
+
+      // Player paddle collision
+      if (
+        ballX - ballSize < paddleWidth &&
+        ballY > playerY &&
+        ballY < playerY + paddleHeight
+      ) {
+        ballSpeedX = -ballSpeedX * 1.05; // increase speed
+        ballSpeedY *= 1.05;
+      }
+
+      // AI paddle collision
+      if (
+        ballX + ballSize > canvas.width - paddleWidth &&
+        ballY > aiY &&
+        ballY < aiY + paddleHeight
+      ) {
+        ballSpeedX = -ballSpeedX * 1.05;
+        ballSpeedY *= 1.05;
+      }
+
+      // Score
+      if (ballX < 0) {
+        aiScore++;
+        resetBall();
+      } else if (ballX > canvas.width) {
+        playerScore++;
+        resetBall();
+      }
+
+      // Win check
+      if (playerScore >= pointsToWin || aiScore >= pointsToWin) {
+        gameRunning = false;
+        document.getElementById("menu").innerHTML = `
+          <h2>${playerScore >= pointsToWin ? "You win!" : "AI wins!"}</h2>
+          <label>Difficulty: </label>
+          <select id="difficulty">
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+            <option value="impossible">Impossible</option>
+          </select>
+          <label>Points to Win: </label>
+          <input type="number" id="pointsToWin" value="5" min="1">
+          <button onclick="startGame()">Play Again</button>
+        `;
+        document.getElementById("menu").style.display = "block";
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Center dashed line
+      ctx.fillStyle = "white";
+      for (let i = 0; i < canvas.height; i += 20) {
+        ctx.fillRect(canvas.width / 2 - 1, i, 2, 10);
+      }
+
+      // Paddles
+      ctx.fillRect(0, playerY, paddleWidth, paddleHeight);
+      ctx.fillRect(canvas.width - paddleWidth, aiY, paddleWidth, paddleHeight);
+
+      // Ball
+      ctx.beginPath();
+      ctx.arc(ballX, ballY, ballSize, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Scores
+      ctx.font = "20px Arial";
+      ctx.fillText(playerScore, canvas.width / 4, 20);
+      ctx.fillText(aiScore, (3 * canvas.width) / 4, 20);
+    }
+
+    // Mouse control for player paddle
+    canvas.addEventListener("mousemove", function (e) {
+      let rect = canvas.getBoundingClientRect();
+      let root = document.documentElement;
+      let mouseY = e.clientY - rect.top - root.scrollTop;
+      playerY = mouseY - paddleHeight / 2;
+      if (playerY < 0) playerY = 0;
+      if (playerY + paddleHeight > canvas.height)
+        playerY = canvas.height - paddleHeight;
+    });
+  </script>
+</body>
+</html>
